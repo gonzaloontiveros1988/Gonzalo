@@ -13,14 +13,14 @@ Las órdenes se ejecutan mediante **GitHub Actions**. Para operar, modifico `com
 
 ## Ejecutar una orden
 
-Editar `comando.json` y hacer push a la rama `claude/alpaca-account-setup-zUFmC`:
+Editar `comando.json` y hacer push a la rama `claude/trading-documentation-n28Vh`:
 
 ```json
 {
-  "accion": "comprar",   // o "vender" o "cuenta"
+  "accion": "comprar",
   "symbol": "TSLA",
   "qty": 1,
-  "id": 6
+  "id": 7
 }
 ```
 
@@ -50,14 +50,35 @@ Después de cada ejecución, el workflow guarda el resultado en `resultado.json`
 }
 ```
 
+Para una consulta de cuenta (`accion: "cuenta"`):
+
+```json
+{
+  "estado": "ok",
+  "equity": "...",
+  "cash": "...",
+  "buying_power": "...",
+  "timestamp": "..."
+}
+```
+
 ## Archivos clave
 
 | Archivo | Descripción |
 |---------|-------------|
-| `comando.json` | Orden a ejecutar (modificar para operar) |
-| `resultado.json` | Resultado de la última orden ejecutada |
-| `ejecutar_orden.py` | Script Python que llama a la API de Alpaca |
+| `Trading/comando.json` | Orden a ejecutar (modificar para operar) |
+| `Trading/resultado.json` | Resultado de la última orden ejecutada |
+| `Trading/ejecutar_orden.py` | Script Python que llama a la API de Alpaca |
 | `.github/workflows/trade.yml` | Workflow que se dispara al cambiar `comando.json` |
+
+## Flujo completo
+
+1. Editar `Trading/comando.json` con la acción deseada e incrementar `id`
+2. Commit y push a la rama de trabajo
+3. GitHub Actions detecta el cambio en `Trading/comando.json` y dispara el workflow
+4. El workflow instala `alpaca-py`, ejecuta `Trading/ejecutar_orden.py`
+5. El script escribe el resultado en `Trading/resultado.json`
+6. El workflow hace commit y push del `resultado.json` actualizado
 
 ## Servidor Replit (alternativo)
 
@@ -68,4 +89,4 @@ Después de cada ejecución, el workflow guarda el resultado en `resultado.json`
 
 ## Rama de trabajo
 
-`claude/alpaca-account-setup-zUFmC`
+`claude/trading-documentation-n28Vh`
