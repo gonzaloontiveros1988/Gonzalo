@@ -1,0 +1,39 @@
+name: Wheel Strategy - TSLA
+
+# The Wheel: sell cash-secured puts → get assigned → sell covered calls → repeat
+# Runs twice daily on market days: at open (9:35 ET) and before close (3:45 PM ET)
+
+on:
+  schedule:
+    - cron: '35 13 * * 1-5'   # 9:35 AM ET — check at open
+    - cron: '45 19 * * 1-5'   # 3:45 PM ET — check before close
+  workflow_dispatch:            # allow manual trigger from GitHub UI
+
+concurrency:
+  group: wheel-tsla
+  cancel-in-progress: false
+
+jobs:
+  rueda:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar dependencias
+        run: pip install alpaca-py
+
+      - name: Ejecutar estrategia rueda
+        env:
+          APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
+          APCA_API_SECRET_KEY: ${{ secrets.APCA_API_SECRET_KEY }}
+        run: python Wheel/rueda_tsla.py
+
+      - name: Guardar estado
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add Wheel/estado_rueda.json
+          git commit -m "Estado rueda TSLA [skip ci]" || echo "Sin cambios"
+          git push origin HEAD:${{ github.ref_name }}
