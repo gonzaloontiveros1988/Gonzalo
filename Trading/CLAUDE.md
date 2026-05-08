@@ -11,15 +11,6 @@ Las órdenes se ejecutan mediante **GitHub Actions**. Para operar, modifico `com
   - `APCA_API_SECRET_KEY`
 - Cuenta: **paper trading** (simulada) en `paper-api.alpaca.markets`
 
-## Cuentas disponibles
-
-| cuenta   | descripción                          | secrets GitHub                                      |
-|----------|--------------------------------------|-----------------------------------------------------|
-| `paper1` | Cuenta paper por defecto             | `APCA_API_KEY_ID` / `APCA_API_SECRET_KEY`           |
-| `paper2` | Cuenta paper "Claude practice"       | `APCA_API_KEY_ID_2` / `APCA_API_SECRET_KEY_2`       |
-
-Si no se especifica `cuenta`, se usa `paper1`.
-
 ## Ejecutar una orden
 
 Editar `comando.json` y hacer push a la rama `claude/trading-documentation-n28Vh`:
@@ -29,7 +20,6 @@ Editar `comando.json` y hacer push a la rama `claude/trading-documentation-n28Vh
   "accion": "comprar",
   "symbol": "TSLA",
   "qty": 1,
-  "cuenta": "paper1",
   "id": 7
 }
 ```
