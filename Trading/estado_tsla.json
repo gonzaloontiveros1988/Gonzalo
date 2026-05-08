@@ -1,4 +1,19 @@
 {
-  "modo": "iniciar",
-  "ts": "2026-05-08T21:40:00"
+  "modo": "activo",
+  "symbol": "TSLA",
+  "entry_price": 428.26,
+  "total_shares": 10,
+  "stop_price": 385.43,
+  "stop_order_id": "41fb9b21-eb2c-441e-a0e0-90c08296dcee",
+  "tp_order_id": "d696da74-0d1f-49ce-8302-405a7d2ac893",
+  "bracket_order_id": "112c0ce4-071e-4a09-9e8f-d97c7df73df5",
+  "trailing_active": false,
+  "trailing_trigger_price": 471.09,
+  "ladder1_price": 342.61,
+  "ladder1_order_id": "9023f7cc-670d-4ab9-beeb-6ea9b63fb1ba",
+  "ladder1_done": false,
+  "ladder2_price": 299.78,
+  "ladder2_order_id": "7b45610f-8f2f-412b-a676-75697f6c44f2",
+  "ladder2_done": false,
+  "inicio": "2026-05-08T18:42:17.261306"
 }
