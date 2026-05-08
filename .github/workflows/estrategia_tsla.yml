@@ -1,0 +1,37 @@
+name: Estrategia TSLA
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  push:
+    paths:
+      - 'Trading/estado_tsla.json'
+
+concurrency:
+  group: estrategia-tsla
+  cancel-in-progress: false
+
+jobs:
+  estrategia:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar dependencias
+        run: pip install alpaca-py
+
+      - name: Ejecutar estrategia
+        env:
+          APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
+          APCA_API_SECRET_KEY: ${{ secrets.APCA_API_SECRET_KEY }}
+        run: python Trading/estrategia_tsla.py
+
+      - name: Guardar estado
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add Trading/estado_tsla.json
+          git commit -m "Estado TSLA [skip ci]" || echo "Sin cambios"
+          git push origin HEAD:${{ github.ref_name }}
