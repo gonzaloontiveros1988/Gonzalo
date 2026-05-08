@@ -1,9 +1,9 @@
 {
   "estado": "ok",
-  "id": "41cbaf98-7291-4de2-9b61-626c3f801ccf",
-  "symbol": "NVDA",
-  "qty": "1",
+  "id": "69edbe89-ea30-4ca3-b88e-1cd3620e7cf3",
+  "symbol": "TSLA",
+  "qty": "3",
   "accion": "comprar",
   "status": "OrderStatus.PENDING_NEW",
-  "timestamp": "2026-05-08T17:37:12.300632"
+  "timestamp": "2026-05-08T18:09:17.666629"
 }
