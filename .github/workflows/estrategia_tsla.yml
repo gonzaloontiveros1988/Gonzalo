@@ -2,7 +2,9 @@ name: Estrategia TSLA
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    # Every 5 minutes Mon-Fri 13:00-20:55 UTC = ~9:00 AM - 4:55 PM ET
+    # Covers full regular session regardless of EST/EDT
+    - cron: '*/5 13-20 * * 1-5'
   push:
     paths:
       - 'Trading/estado_tsla.json'
