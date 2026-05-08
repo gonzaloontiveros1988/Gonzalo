@@ -1,6 +1,4 @@
 {
-  "accion": "comprar",
-  "symbol": "NVDA",
-  "qty": 1,
-  "id": 6
+  "accion": "cuenta",
+  "id": 7
 }
