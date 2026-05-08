@@ -1,6 +1,6 @@
 {
-  "accion": "vender",
-  "symbol": "TSLA",
+  "accion": "comprar",
+  "symbol": "NVDA",
   "qty": 1,
-  "id": 5
+  "id": 6
 }
