@@ -1,4 +1,6 @@
 {
-  "accion": "cuenta",
-  "id": 7
+  "accion": "comprar",
+  "symbol": "TSLA",
+  "qty": 3,
+  "id": 8
 }
