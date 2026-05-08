@@ -11,7 +11,7 @@ client = TradingClient(
     paper=True
 )
 
-with open('comando.json') as f:
+with open('Trading/comando.json') as f:
     cmd = json.load(f)
 
 if cmd['accion'] == 'comprar' or cmd['accion'] == 'vender':
@@ -41,7 +41,7 @@ elif cmd['accion'] == 'cuenta':
         'timestamp': datetime.now().isoformat()
     }
 
-with open('resultado.json', 'w') as f:
+with open('Trading/resultado.json', 'w') as f:
     json.dump(salida, f, indent=2)
 
 print(json.dumps(salida, indent=2))

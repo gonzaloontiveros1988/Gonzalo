@@ -3,7 +3,7 @@ name: Ejecutar Orden Alpaca
 on:
   push:
     paths:
-      - 'comando.json'
+      - 'Trading/comando.json'
 
 jobs:
   trade:
@@ -20,12 +20,12 @@ jobs:
         env:
           APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
           APCA_API_SECRET_KEY: ${{ secrets.APCA_API_SECRET_KEY }}
-        run: python ejecutar_orden.py
+        run: python Trading/ejecutar_orden.py
 
       - name: Guardar resultado
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add resultado.json
+          git add Trading/resultado.json
           git commit -m "Resultado de la orden" || echo "Sin cambios"
           git push origin HEAD:${{ github.ref_name }}
