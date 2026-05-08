@@ -105,23 +105,30 @@ def iniciar():
     ladder1_price = price * (1 - LADDER1_DROP)
     ladder2_price = price * (1 - LADDER2_DROP)
 
-    # Bracket order: market buy + stop loss in one unit — avoids wash trade error
+    # Bracket order: buy + stop loss + take profit (required by Alpaca).
+    # take_profit set at 3x entry — effectively unreachable, only there to satisfy the API.
+    fake_tp = round(price * 3.0, 2)
     bracket = trading.submit_order(MarketOrderRequest(
         symbol=SYMBOL,
         qty=INITIAL_QTY,
         side=OrderSide.BUY,
         time_in_force=TimeInForce.DAY,
         order_class=OrderClass.BRACKET,
-        stop_loss={'stop_price': round(stop_price, 2)}
+        stop_loss={'stop_price': round(stop_price, 2)},
+        take_profit={'limit_price': fake_tp}
     ))
 
-    # Extract the stop loss leg ID from bracket legs
+    # Extract stop loss and take profit leg IDs
     stop_leg_id = None
+    tp_leg_id   = None
     if bracket.legs:
         for leg in bracket.legs:
             if leg.side == OrderSide.SELL:
-                stop_leg_id = str(leg.id)
-                break
+                leg_detail = get_order(str(leg.id))
+                if leg_detail and getattr(leg_detail, 'stop_price', None):
+                    stop_leg_id = str(leg.id)
+                else:
+                    tp_leg_id = str(leg.id)
 
     # Ladder 1: buy 20 more at -20%
     l1 = trading.submit_order(LimitOrderRequest(
@@ -144,6 +151,7 @@ def iniciar():
         'total_shares': INITIAL_QTY,
         'stop_price': round(stop_price, 2),
         'stop_order_id': stop_leg_id,
+        'tp_order_id': tp_leg_id,
         'bracket_order_id': str(bracket.id),
         'trailing_active': False,
         'trailing_trigger_price': round(price * (1 + TRAIL_TRIGGER), 2),
@@ -208,9 +216,10 @@ def monitorear(state):
     change = (price - entry) / entry * 100
     updates = []
 
-    # Activate trailing stop at +10%
+    # Activate trailing stop at +10%: cancel both bracket legs, place trailing
     if not state['trailing_active'] and change >= TRAIL_TRIGGER * 100:
         cancel_order(state['stop_order_id'])
+        cancel_order(state.get('tp_order_id'))
         trail = place_trailing(state['total_shares'])
         state['trailing_active']   = True
         state['stop_order_id']     = str(trail.id)
