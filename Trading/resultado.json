@@ -1,9 +1,9 @@
 {
   "estado": "ok",
-  "id": "4c9d93ae-d459-4d74-ba21-02baf6e5bec5",
+  "id": "bdbe0fdf-d049-46e5-a5e9-c42e5bd1042a",
   "symbol": "TSLA",
   "qty": "1",
   "accion": "vender",
   "status": "OrderStatus.PENDING_NEW",
-  "timestamp": "2026-05-08T17:30:05.413478"
+  "timestamp": "2026-05-08T17:33:11.975837"
 }
