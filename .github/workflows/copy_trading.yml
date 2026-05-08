@@ -1,0 +1,40 @@
+name: Copy Trading - Ro Khanna
+
+# Ro Khanna: +112% excess return vs S&P 500 (Jan 2024 - Apr 2026)
+# Most active Congress trader: 4,107 trades / $53M volume in 2025
+# Runs every 30 min during market hours Mon-Fri
+
+on:
+  schedule:
+    # Every 30 min Mon-Fri 13:00-20:30 UTC = 9:00 AM - 4:30 PM ET
+    - cron: '0,30 13-20 * * 1-5'
+  workflow_dispatch:   # allow manual trigger from GitHub UI
+
+concurrency:
+  group: copy-trading
+  cancel-in-progress: false
+
+jobs:
+  copy_trade:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar dependencias
+        run: pip install alpaca-py requests
+
+      - name: Ejecutar copy trading
+        env:
+          APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
+          APCA_API_SECRET_KEY: ${{ secrets.APCA_API_SECRET_KEY }}
+        run: python CopyTrading/copiar_politico.py
+
+      - name: Guardar estado y log
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add CopyTrading/estado_copy.json CopyTrading/resultado_copy.json
+          git commit -m "Copy trading update [skip ci]" || echo "Sin cambios"
+          git push origin HEAD:${{ github.ref_name }}
