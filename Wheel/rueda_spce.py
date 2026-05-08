@@ -1,19 +1,12 @@
 """
-Wheel Strategy — NVDA
+Wheel Strategy — SPCE
 =====================
-Initial investment: $10,000 in NVDA shares (buy on first run)
-
-Stage 0 → Buy:  Purchase as many 100-share lots as $10,000 allows.
-               If price > $100 and $10,000 < 100 shares, start with puts instead.
-Stage 1 → Sell covered calls: 10% above cost basis, 2-4 weeks out
-           If shares called away → back to Stage 1 (sell puts with cash)
-Stage 2 → Sell cash-secured puts: 10% OTM, 2-4 weeks out (if shares called away)
-           If assigned again → back to selling calls
+Stage 1: Sell cash-secured put  → 10% OTM, 2-4 weeks out
+Stage 2: Sell covered call      → 10% above cost basis, 2-4 weeks out
 
 Rules enforced:
-- Buy exactly floor(10000 / price / 100) * 100 shares on init (multiples of 100)
+- Never sell put without enough cash to buy shares if assigned
 - Never sell call below cost basis (purchase price minus all premiums)
-- Never sell put without enough cash to cover assignment
 - Close any position early at 50% profit, immediately re-sell
 - Track total premium across all cycles
 - Daily summary at market close
@@ -25,25 +18,23 @@ import json
 import datetime as dt
 from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import (
-    GetOptionContractsRequest, LimitOrderRequest, MarketOrderRequest
+    GetOptionContractsRequest, LimitOrderRequest
 )
 from alpaca.trading.enums import OrderSide, TimeInForce, OrderType, ContractType
-
 from alpaca.data.historical import StockHistoricalDataClient, OptionHistoricalDataClient
 from alpaca.data.requests import StockLatestQuoteRequest, OptionLatestQuoteRequest
 
 # ── Parameters ────────────────────────────────────────────────────────────────
-SYMBOL       = 'NVDA'
-BUDGET       = 10_000.0   # initial capital to deploy in NVDA
-CONTRACTS    = 1           # 1 contract = 100 shares
-PUT_OTM_PCT  = 0.10        # sell put 10% below current price
-CALL_OTM_PCT = 0.10        # sell call 10% above cost basis
-DTE_MIN      = 14          # 2 weeks minimum
-DTE_MAX      = 28          # 4 weeks maximum
-EARLY_CLOSE  = 0.50        # close at 50% profit
+SYMBOL       = 'SPCE'
+CONTRACTS    = 1          # 1 contract = 100 shares
+PUT_OTM_PCT  = 0.10       # sell put 10% below current price
+CALL_OTM_PCT = 0.10       # sell call 10% above cost basis
+DTE_MIN      = 14         # 2 weeks minimum
+DTE_MAX      = 28         # 4 weeks maximum
+EARLY_CLOSE  = 0.50       # close at 50% profit
 
-STATE_FILE   = 'Wheel/estado_rueda_nvda.json'
-SUMMARY_FILE = 'Wheel/resumen_diario_nvda.json'
+STATE_FILE   = 'Wheel/estado_rueda_spce.json'
+SUMMARY_FILE = 'Wheel/resumen_diario_spce.json'
 
 # ── Clients ───────────────────────────────────────────────────────────────────
 API_KEY    = os.environ['APCA_API_KEY_ID']
@@ -58,7 +49,7 @@ option_data = OptionHistoricalDataClient(API_KEY, API_SECRET)
 
 def now_et():
     utc = dt.datetime.utcnow()
-    offset = -4  # EDT (UTC-4), switch to -5 in November
+    offset = -4  # EDT (UTC-4); changes to -5 in November
     return utc + dt.timedelta(hours=offset)
 
 def is_market_hours():
@@ -82,12 +73,11 @@ def load_state():
             return json.load(f)
     except FileNotFoundError:
         return {
-            'fase':               'iniciar',   # first run buys shares
+            'fase':               'vender_put',
             'ciclos':             0,
             'premium_total':      0.0,
             'premium_this_cycle': 0.0,
             'cost_basis':         None,
-            'shares_held':        0,
         }
 
 def save_state(state):
@@ -144,18 +134,22 @@ def target_expiry():
         expiry += dt.timedelta(days=7)
     return expiry
 
-def round_strike(price):
-    return round(price / 5) * 5
+def round_strike_spce(price):
+    """SPCE options have $0.50 or $1 strikes depending on price range."""
+    if price < 5:
+        return round(price * 2) / 2   # round to $0.50
+    return round(price)               # round to $1
 
 def find_contract(contract_type, strike, expiry):
     try:
+        # Wider search window for SPCE (fewer available strikes)
         result = trading.get_option_contracts(GetOptionContractsRequest(
             underlying_symbols=[SYMBOL],
             contract_type=contract_type,
-            expiration_date_gte=expiry - dt.timedelta(days=5),
-            expiration_date_lte=expiry + dt.timedelta(days=5),
-            strike_price_gte=str(strike - 10),
-            strike_price_lte=str(strike + 10),
+            expiration_date_gte=expiry - dt.timedelta(days=7),
+            expiration_date_lte=expiry + dt.timedelta(days=7),
+            strike_price_gte=str(max(0.5, strike - 5)),
+            strike_price_lte=str(strike + 5),
             status='active',
         ))
         contracts = getattr(result, 'option_contracts', result)
@@ -171,11 +165,11 @@ def find_contract(contract_type, strike, expiry):
 
 def can_afford_put(strike):
     try:
-        acct = get_account()
+        acct         = get_account()
         buying_power = float(acct.buying_power)
-        needed = strike * 100 * CONTRACTS
-        ok = buying_power >= needed
-        print(f'  Cash check: need ${needed:,.0f} | have ${buying_power:,.0f} → {"OK" if ok else "INSUFFICIENT"}')
+        needed       = strike * 100 * CONTRACTS
+        ok           = buying_power >= needed
+        print(f'  Cash check: need ${needed:,.2f} | have ${buying_power:,.2f} → {"OK" if ok else "INSUFFICIENT"}')
         return ok
     except Exception as e:
         print(f'  [cash check error]: {e}')
@@ -228,74 +222,136 @@ def check_early_close(state):
     return False
 
 
-# ── Stage 0: Initial share purchase ──────────────────────────────────────────
+# ── Stage 1: Sell cash-secured put ───────────────────────────────────────────
 
-def fase_iniciar(state):
-    """
-    Buy exactly 100 shares of NVDA (minimum to sell 1 covered call).
-    Uses BUDGET as reference but always buys 100 shares regardless of price
-    since the paper account has sufficient buying power.
-    """
+def fase_vender_put(state):
     price  = get_stock_price()
-    shares = 100   # always buy exactly 1 lot (100 shares) for covered call selling
-    cost   = shares * price
+    strike = round_strike_spce(price * (1 - PUT_OTM_PCT))
+    expiry = target_expiry()
+    dte    = (expiry - dt.date.today()).days
 
-    print(f'NVDA @ ${price:.2f}')
-    print(f'Buying {shares} shares → estimated ${cost:,.0f} (budget reference: ${BUDGET:,.0f})')
+    print(f'SPCE @ ${price:.2f}')
+    print(f'Target put: ${strike} strike | {expiry} ({dte} DTE)')
 
-    # Verify the account can cover the purchase
+    if not can_afford_put(strike):
+        print('Insufficient buying power — skipping')
+        return state
+
+    contract = find_contract(ContractType.PUT, strike, expiry)
+    if not contract:
+        print('No suitable put contract found — will retry next cycle')
+        print('  (SPCE may have limited options availability)')
+        return state
+
+    mid = get_option_mid(contract.symbol)
+    if not mid or mid < 0.01:
+        print(f'No valid premium for {contract.symbol} (bid/ask too low)')
+        return state
+
+    limit_px = round(mid, 2)
+
     try:
-        acct = get_account()
-        bp   = float(acct.buying_power)
-        if bp < cost:
-            print(f'  Insufficient buying power: have ${bp:,.0f}, need ${cost:,.0f}')
-            state['fase'] = 'vender_put'
-            return state
-    except Exception as e:
-        print(f'  [account check error]: {e}')
-
-    try:
-        order = trading.submit_order(MarketOrderRequest(
-            symbol=SYMBOL,
-            qty=shares,
-            side=OrderSide.BUY,
+        order = trading.submit_order(LimitOrderRequest(
+            symbol=contract.symbol,
+            qty=CONTRACTS,
+            side=OrderSide.SELL,
+            type=OrderType.LIMIT,
             time_in_force=TimeInForce.DAY,
+            limit_price=limit_px,
         ))
-        cost_basis = price
-        print(f'\n  BOUGHT {shares} shares of {SYMBOL} @ ~${price:.2f}')
-        print(f'  Estimated cost: ${cost:,.0f}')
-        print(f'  Cost basis:     ${cost_basis:.2f}/share')
-        print(f'  Order ID:       {order.id}')
+        gross = limit_px * 100 * CONTRACTS
+        print(f'\n  SOLD PUT:  {contract.symbol}')
+        print(f'  Premium:   ${limit_px:.2f}/share | ${gross:.2f} total')
+        print(f'  Strike:    ${contract.strike_price} | Expiry: {contract.expiration_date} ({dte} DTE)')
+        print(f'  Breakeven: ${float(contract.strike_price) - limit_px:.2f}')
+        print(f'  Obligation: buy 100 shares @ ${contract.strike_price} if assigned')
 
         state.update({
-            'fase':               'asignado',   # go straight to covered call selling
-            'shares_held':        shares,
-            'cost_basis':         round(cost_basis, 2),
-            'buy_order_id':       str(order.id),
-            'buy_price':          round(price, 2),
-            'buy_date':           dt.datetime.now().isoformat(),
+            'fase':               'put_vendida',
+            'put_symbol':         contract.symbol,
+            'put_strike':         float(contract.strike_price),
+            'put_expiry':         str(contract.expiration_date),
+            'put_premium':        limit_px,
+            'put_order_id':       str(order.id),
+            'put_sold_at':        dt.datetime.now().isoformat(),
+            'entry_price':        price,
+            'premium_this_cycle': round(state.get('premium_this_cycle', 0) + gross, 2),
         })
     except Exception as e:
-        print(f'  [buy error]: {e}')
+        print(f'  [sell put error]: {e}')
 
     return state
 
 
-# ── Stage 1: Sell covered call ────────────────────────────────────────────────
+# ── Stage 1 monitor ───────────────────────────────────────────────────────────
+
+def fase_monitor_put(state):
+    if check_early_close(state):
+        state['fase'] = 'vender_put'
+        return state
+
+    put_symbol = state.get('put_symbol', '')
+    put_strike = state.get('put_strike', 0.0)
+    put_expiry = state.get('put_expiry', '')
+
+    price    = get_stock_price()
+    expiry_d = dt.date.fromisoformat(put_expiry) if put_expiry else dt.date.today()
+    dte      = (expiry_d - dt.date.today()).days
+    otm_pct  = (price - put_strike) / price * 100 if price > 0 else 0
+
+    print(f'SPCE @ ${price:.2f} | Short put ${put_strike} | {dte} DTE | {otm_pct:.1f}% OTM')
+
+    put_qty = get_position(put_symbol)
+
+    if dte <= 0 or put_qty == 0:
+        spce_qty = get_position(SYMBOL)
+        if spce_qty >= 100:
+            # Assigned
+            gross      = state.get('put_premium', 0) * 100
+            cost_basis = put_strike - (state.get('premium_this_cycle', gross) / 100)
+            state.update({
+                'fase':             'asignado',
+                'assignment_price': put_strike,
+                'shares_held':      spce_qty,
+                'cost_basis':       round(cost_basis, 2),
+            })
+            print(f'  ASSIGNED at ${put_strike}')
+            print(f'  Effective cost basis: ${cost_basis:.2f}/share (after premiums)')
+        else:
+            # Expired worthless
+            gross = state.get('put_premium', 0) * 100
+            state['premium_total']      = round(state.get('premium_total', 0) + gross, 2)
+            state['premium_this_cycle'] = 0.0
+            state['ciclos']             = state.get('ciclos', 0) + 1
+            state['fase']               = 'vender_put'
+            print(f'  PUT EXPIRED WORTHLESS — ${gross:.2f} profit')
+            print(f'  Cycle #{state["ciclos"]} done | All-time premium: ${state["premium_total"]:.2f}')
+        return state
+
+    if dte <= 5 and price <= put_strike * 1.02:
+        print(f'  WARNING: {dte} DTE and near/below strike — assignment possible')
+
+    state['ultimo_chequeo'] = dt.datetime.now().isoformat()
+    state['spce_price']     = price
+    state['dte']            = dte
+    return state
+
+
+# ── Stage 2: Sell covered call ────────────────────────────────────────────────
 
 def fase_vender_call(state):
-    cost_basis = state.get('cost_basis', state.get('buy_price', 0))
+    cost_basis = state.get('cost_basis', state.get('assignment_price', 0))
     price      = get_stock_price()
     expiry     = target_expiry()
     dte        = (expiry - dt.date.today()).days
 
-    # Rule: call strike must be at least 10% above current price AND above cost basis
-    target_strike = round_strike(max(
+    # Rule: call strike must be above cost basis AND 10% OTM from current price
+    target_strike = round_strike_spce(max(
         price * (1 + CALL_OTM_PCT),
-        cost_basis * 1.005              # never below cost basis
+        cost_basis * 1.005
     ))
 
-    print(f'NVDA @ ${price:.2f} | Cost basis: ${cost_basis:.2f}')
+    print(f'SPCE @ ${price:.2f} | Cost basis: ${cost_basis:.2f}')
     print(f'Target call: ${target_strike} | {expiry} ({dte} DTE)')
 
     contract = find_contract(ContractType.CALL, target_strike, expiry)
@@ -303,13 +359,13 @@ def fase_vender_call(state):
         print('No suitable call contract found — will retry')
         return state
 
-    # Hard safety: block if strike would be below cost basis
+    # Hard block: never sell below cost basis
     if float(contract.strike_price) < cost_basis:
         print(f'  BLOCKED: strike ${contract.strike_price} < cost basis ${cost_basis:.2f}')
         return state
 
     mid = get_option_mid(contract.symbol)
-    if not mid or mid < 0.05:
+    if not mid or mid < 0.01:
         print(f'No valid premium for {contract.symbol}')
         return state
 
@@ -329,9 +385,9 @@ def fase_vender_call(state):
         if_called  = (float(contract.strike_price) - cost_basis) * 100 * CONTRACTS
 
         print(f'\n  SOLD CALL: {contract.symbol}')
-        print(f'  Premium:   ${limit_px:.2f}/share | ${gross:.0f} total')
+        print(f'  Premium:   ${limit_px:.2f}/share | ${gross:.2f} total')
         print(f'  Strike:    ${contract.strike_price} | Expiry: {contract.expiration_date} ({dte} DTE)')
-        print(f'  If called: stock profit ${if_called:.0f} + cycle premium ${total_cyc:.0f}')
+        print(f'  If called: stock profit ${if_called:.2f} + cycle premium ${total_cyc:.2f}')
 
         state.update({
             'fase':               'call_vendida',
@@ -349,11 +405,11 @@ def fase_vender_call(state):
     return state
 
 
-# ── Stage 1 monitor ───────────────────────────────────────────────────────────
+# ── Stage 2 monitor ───────────────────────────────────────────────────────────
 
 def fase_monitor_call(state):
     if check_early_close(state):
-        state['fase'] = 'asignado'   # re-sell a new call
+        state['fase'] = 'asignado'
         return state
 
     call_symbol = state.get('call_symbol', '')
@@ -366,22 +422,22 @@ def fase_monitor_call(state):
     dte      = (expiry_d - dt.date.today()).days
     pnl      = (price - cost_basis) * state.get('shares_held', 100)
 
-    print(f'NVDA @ ${price:.2f} | Short call ${call_strike} | {dte} DTE | Unrealized PnL: ${pnl:.2f}')
+    print(f'SPCE @ ${price:.2f} | Short call ${call_strike} | {dte} DTE | Stock PnL: ${pnl:.2f}')
 
     call_qty = get_position(call_symbol)
 
     if dte <= 0 or call_qty == 0:
-        nvda_qty = get_position(SYMBOL)
-        if nvda_qty < 100:
-            # Shares called away — go back to put selling
+        spce_qty = get_position(SYMBOL)
+        if spce_qty < 100:
+            # Shares called away — go back to selling puts
             stock_profit  = (call_strike - cost_basis) * 100 * CONTRACTS
             total_premium = state.get('premium_this_cycle', 0)
             state['premium_total'] = round(state.get('premium_total', 0) + total_premium, 2)
             state['ciclos']        = state.get('ciclos', 0) + 1
             print(f'\n  SHARES CALLED AWAY at ${call_strike}')
-            print(f'  Stock profit:     ${stock_profit:.0f}')
-            print(f'  Cycle premium:    ${total_premium:.0f}')
-            print(f'  Cycle total:      ${stock_profit + total_premium:.0f}')
+            print(f'  Stock profit:     ${stock_profit:.2f}')
+            print(f'  Cycle premium:    ${total_premium:.2f}')
+            print(f'  Cycle total:      ${stock_profit + total_premium:.2f}')
             print(f'  All-time premium: ${state["premium_total"]:.2f}')
             state.update({
                 'fase':               'vender_put',
@@ -396,122 +452,11 @@ def fase_monitor_call(state):
             state['premium_this_cycle'] = round(state.get('premium_this_cycle', 0) + gross, 2)
             state['ciclos']             = state.get('ciclos', 0) + 1
             state['fase']               = 'asignado'
-            print(f'  CALL EXPIRED WORTHLESS — ${gross:.0f} premium kept | selling new call')
+            print(f'  CALL EXPIRED WORTHLESS — ${gross:.2f} premium kept | selling new call')
         return state
 
     state['ultimo_chequeo'] = dt.datetime.now().isoformat()
-    state['nvda_price']     = price
-    state['dte']            = dte
-    return state
-
-
-# ── Stage 2: Sell cash-secured put (after shares get called away) ─────────────
-
-def fase_vender_put(state):
-    price  = get_stock_price()
-    strike = round_strike(price * (1 - PUT_OTM_PCT))   # 10% OTM
-    expiry = target_expiry()
-    dte    = (expiry - dt.date.today()).days
-
-    print(f'NVDA @ ${price:.2f}')
-    print(f'Target put: ${strike} | {expiry} ({dte} DTE)')
-
-    if not can_afford_put(strike):
-        print('Insufficient buying power — skipping this cycle')
-        return state
-
-    contract = find_contract(ContractType.PUT, strike, expiry)
-    if not contract:
-        print('No suitable put contract found — will retry')
-        return state
-
-    mid = get_option_mid(contract.symbol)
-    if not mid or mid < 0.05:
-        print(f'No valid premium for {contract.symbol}')
-        return state
-
-    limit_px = round(mid, 2)
-
-    try:
-        order = trading.submit_order(LimitOrderRequest(
-            symbol=contract.symbol,
-            qty=CONTRACTS,
-            side=OrderSide.SELL,
-            type=OrderType.LIMIT,
-            time_in_force=TimeInForce.DAY,
-            limit_price=limit_px,
-        ))
-        gross = limit_px * 100 * CONTRACTS
-        print(f'\n  SOLD PUT:  {contract.symbol}')
-        print(f'  Premium:   ${limit_px:.2f}/share | ${gross:.0f} total')
-        print(f'  Strike:    ${contract.strike_price} | Expiry: {contract.expiration_date} ({dte} DTE)')
-        print(f'  Breakeven: ${float(contract.strike_price) - limit_px:.2f}')
-
-        state.update({
-            'fase':               'put_vendida',
-            'put_symbol':         contract.symbol,
-            'put_strike':         float(contract.strike_price),
-            'put_expiry':         str(contract.expiration_date),
-            'put_premium':        limit_px,
-            'put_order_id':       str(order.id),
-            'put_sold_at':        dt.datetime.now().isoformat(),
-            'entry_price':        price,
-            'premium_this_cycle': round(state.get('premium_this_cycle', 0) + gross, 2),
-        })
-    except Exception as e:
-        print(f'  [sell put error]: {e}')
-
-    return state
-
-
-# ── Stage 2 monitor ───────────────────────────────────────────────────────────
-
-def fase_monitor_put(state):
-    if check_early_close(state):
-        state['fase'] = 'vender_put'
-        return state
-
-    put_symbol = state.get('put_symbol', '')
-    put_strike = state.get('put_strike', 0.0)
-    put_expiry = state.get('put_expiry', '')
-
-    price    = get_stock_price()
-    expiry_d = dt.date.fromisoformat(put_expiry) if put_expiry else dt.date.today()
-    dte      = (expiry_d - dt.date.today()).days
-    otm_pct  = (price - put_strike) / price * 100
-
-    print(f'NVDA @ ${price:.2f} | Short put ${put_strike} | {dte} DTE | {otm_pct:.1f}% OTM')
-
-    put_qty = get_position(put_symbol)
-
-    if dte <= 0 or put_qty == 0:
-        nvda_qty = get_position(SYMBOL)
-        if nvda_qty >= 100:
-            # Assigned — update cost basis with all premiums received
-            gross      = state.get('put_premium', 0) * 100
-            cost_basis = put_strike - (state.get('premium_this_cycle', gross) / 100)
-            state.update({
-                'fase':            'asignado',
-                'assignment_price': put_strike,
-                'shares_held':     nvda_qty,
-                'cost_basis':      round(cost_basis, 2),
-            })
-            print(f'  ASSIGNED at ${put_strike} | Effective cost basis: ${cost_basis:.2f}')
-        else:
-            # Expired worthless
-            gross = state.get('put_premium', 0) * 100
-            state['premium_total']      = round(state.get('premium_total', 0) + gross, 2)
-            state['premium_this_cycle'] = round(state.get('premium_this_cycle', 0) + gross, 2)
-            state['ciclos']             = state.get('ciclos', 0) + 1
-            state['fase']               = 'vender_put'
-            print(f'  PUT EXPIRED WORTHLESS — ${gross:.0f} profit | cycle #{state["ciclos"]}')
-        return state
-
-    if dte <= 5 and price <= put_strike * 1.02:
-        print(f'  WARNING: {dte} DTE and near/below strike — assignment likely')
-
-    state['ultimo_chequeo'] = dt.datetime.now().isoformat()
-    state['nvda_price']     = price
+    state['spce_price']     = price
     state['dte']            = dte
     return state
 
@@ -528,49 +473,46 @@ def generate_daily_summary(state):
     except Exception:
         equity = cash = buying_power = 0
 
-    nvda_qty   = get_position(SYMBOL)
+    spce_qty   = get_position(SYMBOL)
     cost_basis = state.get('cost_basis')
-    stock_pnl  = (price - cost_basis) * nvda_qty if cost_basis and nvda_qty else 0
+    stock_pnl  = (price - cost_basis) * spce_qty if cost_basis and spce_qty else 0
 
     summary = {
-        'date':                    dt.date.today().isoformat(),
-        'time_et':                 now_et().strftime('%H:%M'),
-        'nvda_price':              f'${price:.2f}',
-        '── WHEEL STATUS ──':      '─' * 30,
-        'fase':                    state.get('fase'),
-        'ciclos_completados':      state.get('ciclos', 0),
-        'premium_total_all_time':  f"${state.get('premium_total', 0):.2f}",
-        'premium_this_cycle':      f"${state.get('premium_this_cycle', 0):.2f}",
-        '── POSITIONS ──':         '─' * 30,
-        'nvda_shares':             nvda_qty,
-        'cost_basis':              f'${cost_basis:.2f}' if cost_basis else 'N/A',
-        'stock_pnl':               f'${stock_pnl:.2f}',
-        'open_put':                (state.get('put_symbol', 'None')
-                                    if state.get('fase') == 'put_vendida' else 'None'),
-        'open_call':               (state.get('call_symbol', 'None')
-                                    if state.get('fase') == 'call_vendida' else 'None'),
-        'dte_remaining':           state.get('dte', 'N/A'),
-        '── ACCOUNT ──':           '─' * 30,
-        'equity':                  f'${equity:,.2f}',
-        'cash':                    f'${cash:,.2f}',
-        'buying_power':            f'${buying_power:,.2f}',
-        '── TOTAL RETURN ──':      '─' * 30,
-        'total_return':            f"${state.get('premium_total', 0) + stock_pnl:.2f}",
-        'initial_investment':      f'${BUDGET:,.0f}',
-        'return_pct':              (f"{((state.get('premium_total', 0) + stock_pnl) / BUDGET * 100):.2f}%"
-                                    if BUDGET else 'N/A'),
+        'date':                   dt.date.today().isoformat(),
+        'time_et':                now_et().strftime('%H:%M'),
+        'spce_price':             f'${price:.2f}',
+        '── WHEEL STATUS ──':     '─' * 30,
+        'fase':                   state.get('fase'),
+        'ciclos_completados':     state.get('ciclos', 0),
+        'premium_total_all_time': f"${state.get('premium_total', 0):.2f}",
+        'premium_this_cycle':     f"${state.get('premium_this_cycle', 0):.2f}",
+        '── POSITIONS ──':        '─' * 30,
+        'spce_shares':            spce_qty,
+        'cost_basis':             f'${cost_basis:.2f}' if cost_basis else 'N/A',
+        'stock_pnl':              f'${stock_pnl:.2f}',
+        'open_put':               (state.get('put_symbol', 'None')
+                                   if state.get('fase') == 'put_vendida' else 'None'),
+        'open_call':              (state.get('call_symbol', 'None')
+                                   if state.get('fase') == 'call_vendida' else 'None'),
+        'dte_remaining':          state.get('dte', 'N/A'),
+        '── ACCOUNT ──':          '─' * 30,
+        'equity':                 f'${equity:,.2f}',
+        'cash':                   f'${cash:,.2f}',
+        'buying_power':           f'${buying_power:,.2f}',
+        '── TOTAL RETURN ──':     '─' * 30,
+        'total_return':           f"${state.get('premium_total', 0) + stock_pnl:.2f}",
     }
 
     with open(SUMMARY_FILE, 'w') as f:
         json.dump(summary, f, indent=2)
 
-    print('\n' + '═' * 52)
-    print('  DAILY SUMMARY — WHEEL STRATEGY NVDA ($10,000)')
-    print('═' * 52)
+    print('\n' + '═' * 50)
+    print('  DAILY SUMMARY — WHEEL STRATEGY SPCE')
+    print('═' * 50)
     for k, v in summary.items():
         if '──' not in str(k):
-            print(f'  {k:<32} {v}')
-    print('═' * 52)
+            print(f'  {k:<30} {v}')
+    print('═' * 50)
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -580,22 +522,20 @@ if not is_market_hours():
     exit(0)
 
 state = load_state()
-fase  = state.get('fase', 'iniciar')
+fase  = state.get('fase', 'vender_put')
 
-print(f'[{now_et().strftime("%Y-%m-%d %H:%M ET")}]  WHEEL STRATEGY — NVDA ($10,000)')
+print(f'[{now_et().strftime("%Y-%m-%d %H:%M ET")}]  WHEEL STRATEGY — SPCE')
 print(f'Fase: {fase} | Ciclos: {state.get("ciclos", 0)} | Premium total: ${state.get("premium_total", 0):.2f}')
 print('─' * 60)
 
-if fase == 'iniciar':
-    state = fase_iniciar(state)
+if fase == 'vender_put':
+    state = fase_vender_put(state)
+elif fase == 'put_vendida':
+    state = fase_monitor_put(state)
 elif fase == 'asignado':
     state = fase_vender_call(state)
 elif fase == 'call_vendida':
     state = fase_monitor_call(state)
-elif fase == 'vender_put':
-    state = fase_vender_put(state)
-elif fase == 'put_vendida':
-    state = fase_monitor_put(state)
 else:
     print(f'Unknown fase: {fase}')
 

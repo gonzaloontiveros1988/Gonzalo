@@ -1,15 +1,15 @@
-name: Wheel Strategy - NVDA
+name: Wheel Strategy - SPCE
 
-# Buy $10,000 in NVDA then run the wheel: sell covered calls → if called away → sell puts → repeat
-# Runs every 15 min during market hours (9:00 AM - 4:00 PM ET, Mon-Fri)
+# The Wheel on SPCE: sell cash-secured puts → get assigned → sell covered calls → repeat
+# Runs every 15 min during market hours (9:30 AM - 4:00 PM ET, Mon-Fri)
 
 on:
   schedule:
-    - cron: '*/15 13-20 * * 1-5'  # Every 15 min Mon-Fri, covers 9:00 AM - 4:00 PM ET
+    - cron: '*/15 13-20 * * 1-5'  # Every 15 min Mon-Fri, covers ET market hours
   workflow_dispatch:                # allow manual trigger from GitHub UI
 
 concurrency:
-  group: wheel-nvda
+  group: wheel-spce
   cancel-in-progress: false
 
 jobs:
@@ -23,17 +23,17 @@ jobs:
       - name: Instalar dependencias
         run: pip install alpaca-py
 
-      - name: Ejecutar estrategia rueda NVDA
+      - name: Ejecutar estrategia rueda SPCE
         env:
           APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
           APCA_API_SECRET_KEY: ${{ secrets.APCA_API_SECRET_KEY }}
-        run: python Wheel/rueda_nvda.py
+        run: python Wheel/rueda_spce.py
 
       - name: Guardar estado
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add Wheel/estado_rueda_nvda.json
-          git add Wheel/resumen_diario_nvda.json || true
-          git commit -m "Estado rueda NVDA [skip ci]" || echo "Sin cambios"
+          git add Wheel/estado_rueda_spce.json
+          git add Wheel/resumen_diario_spce.json || true
+          git commit -m "Estado rueda SPCE [skip ci]" || echo "Sin cambios"
           git push origin HEAD:${{ github.ref_name }}

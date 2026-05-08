@@ -1,8 +1,7 @@
 {
-  "fase": "iniciar",
+  "fase": "vender_put",
   "ciclos": 0,
   "premium_total": 0.0,
   "premium_this_cycle": 0.0,
-  "cost_basis": null,
-  "shares_held": 0
+  "cost_basis": null
 }
