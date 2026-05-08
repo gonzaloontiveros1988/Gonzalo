@@ -7,7 +7,8 @@ from alpaca.trading.requests import (
     MarketOrderRequest, LimitOrderRequest, StopOrderRequest,
     TrailingStopOrderRequest
 )
-from alpaca.trading.enums import OrderSide, TimeInForce, OrderStatus, OrderClass
+from alpaca.trading.requests import GetOrdersRequest
+from alpaca.trading.enums import OrderSide, TimeInForce, OrderStatus, OrderClass, QueryOrderStatus
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockLatestQuoteRequest
 
@@ -83,7 +84,22 @@ def place_trailing(qty):
     ))
 
 
+def cancelar_ordenes_abiertas():
+    try:
+        abiertas = trading.get_orders(GetOrdersRequest(
+            symbol=SYMBOL, status=QueryOrderStatus.OPEN
+        ))
+        for o in abiertas:
+            cancel_order(str(o.id))
+        if abiertas:
+            print(f'Canceladas {len(abiertas)} ordenes abiertas de {SYMBOL}')
+    except Exception as e:
+        print(f'Error cancelando ordenes: {e}')
+
+
 def iniciar():
+    cancelar_ordenes_abiertas()
+
     price         = get_price()
     stop_price    = price * (1 - STOP_PCT)
     ladder1_price = price * (1 - LADDER1_DROP)
