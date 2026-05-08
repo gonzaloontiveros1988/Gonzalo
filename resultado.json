@@ -1,9 +1,9 @@
 {
   "estado": "ok",
-  "id": "eb5a812d-418d-4f62-9cc0-cdfefc8b27ba",
+  "id": "c08daaf5-9f2d-4acb-b380-4d384a8ff838",
   "symbol": "AAPL",
   "qty": "1",
-  "accion": "comprar",
+  "accion": "vender",
   "status": "OrderStatus.PENDING_NEW",
-  "timestamp": "2026-05-08T17:15:52.794238"
+  "timestamp": "2026-05-08T17:17:46.226718"
 }
