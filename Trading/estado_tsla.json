@@ -1,5 +1,5 @@
 {
-  "modo": "activo",
+  "modo": "actualizar_ladders",
   "symbol": "TSLA",
   "entry_price": 428.26,
   "total_shares": 10,
@@ -9,11 +9,9 @@
   "bracket_order_id": "112c0ce4-071e-4a09-9e8f-d97c7df73df5",
   "trailing_active": false,
   "trailing_trigger_price": 471.09,
-  "ladder1_price": 342.61,
-  "ladder1_order_id": "9023f7cc-670d-4ab9-beeb-6ea9b63fb1ba",
-  "ladder1_done": false,
-  "ladder2_price": 299.78,
-  "ladder2_order_id": "7b45610f-8f2f-412b-a676-75697f6c44f2",
-  "ladder2_done": false,
+  "ladders": [
+    {"key": "ladder1", "drop_pct": 0.20, "price": 342.61, "qty": 20, "order_id": "9023f7cc-670d-4ab9-beeb-6ea9b63fb1ba", "done": false},
+    {"key": "ladder2", "drop_pct": 0.30, "price": 299.78, "qty": 20, "order_id": "7b45610f-8f2f-412b-a676-75697f6c44f2", "done": false}
+  ],
   "inicio": "2026-05-08T18:42:17.261306"
 }
