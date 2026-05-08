@@ -1,9 +1,9 @@
 {
   "estado": "ok",
-  "id": "c08daaf5-9f2d-4acb-b380-4d384a8ff838",
-  "symbol": "AAPL",
+  "id": "d7542868-d12b-4960-b7f4-a4d347969204",
+  "symbol": "TSLA",
   "qty": "1",
-  "accion": "vender",
+  "accion": "comprar",
   "status": "OrderStatus.PENDING_NEW",
-  "timestamp": "2026-05-08T17:17:46.226718"
+  "timestamp": "2026-05-08T17:19:10.763348"
 }
