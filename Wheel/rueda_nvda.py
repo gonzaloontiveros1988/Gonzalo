@@ -232,21 +232,27 @@ def check_early_close(state):
 
 def fase_iniciar(state):
     """
-    Buy as many 100-share lots of NVDA as BUDGET allows.
-    If the stock is too expensive for even 100 shares, switch to put selling.
+    Buy exactly 100 shares of NVDA (minimum to sell 1 covered call).
+    Uses BUDGET as reference but always buys 100 shares regardless of price
+    since the paper account has sufficient buying power.
     """
     price  = get_stock_price()
-    lots   = int(BUDGET / price / 100)     # full 100-share lots within budget
-    shares = lots * 100
+    shares = 100   # always buy exactly 1 lot (100 shares) for covered call selling
+    cost   = shares * price
 
     print(f'NVDA @ ${price:.2f}')
-    print(f'Budget ${BUDGET:,.0f} → {lots} lot(s) → {shares} shares (${shares*price:,.0f})')
+    print(f'Buying {shares} shares → estimated ${cost:,.0f} (budget reference: ${BUDGET:,.0f})')
 
-    if shares < 100:
-        print(f'  ${BUDGET:,.0f} not enough for 100 shares at ${price:.2f}')
-        print(f'  → Switching to put-selling mode (Stage 1) with ${BUDGET:,.0f} as collateral')
-        state['fase'] = 'vender_put'
-        return state
+    # Verify the account can cover the purchase
+    try:
+        acct = get_account()
+        bp   = float(acct.buying_power)
+        if bp < cost:
+            print(f'  Insufficient buying power: have ${bp:,.0f}, need ${cost:,.0f}')
+            state['fase'] = 'vender_put'
+            return state
+    except Exception as e:
+        print(f'  [account check error]: {e}')
 
     try:
         order = trading.submit_order(MarketOrderRequest(
@@ -255,9 +261,9 @@ def fase_iniciar(state):
             side=OrderSide.BUY,
             time_in_force=TimeInForce.DAY,
         ))
-        cost_basis = price  # approximation; will be refined from fill price
+        cost_basis = price
         print(f'\n  BOUGHT {shares} shares of {SYMBOL} @ ~${price:.2f}')
-        print(f'  Estimated cost: ${shares * price:,.0f}')
+        print(f'  Estimated cost: ${cost:,.0f}')
         print(f'  Cost basis:     ${cost_basis:.2f}/share')
         print(f'  Order ID:       {order.id}')
 
