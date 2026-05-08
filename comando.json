@@ -1,6 +1,6 @@
 {
-  "accion": "comprar",
+  "accion": "vender",
   "symbol": "AAPL",
   "qty": 1,
-  "id": 2
+  "id": 3
 }
