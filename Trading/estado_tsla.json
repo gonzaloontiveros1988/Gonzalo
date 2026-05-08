@@ -1,5 +1,5 @@
 {
-  "modo": "actualizar_ladders",
+  "modo": "activo",
   "symbol": "TSLA",
   "entry_price": 428.26,
   "total_shares": 10,
@@ -10,8 +10,30 @@
   "trailing_active": false,
   "trailing_trigger_price": 471.09,
   "ladders": [
-    {"key": "ladder1", "drop_pct": 0.20, "price": 342.61, "qty": 20, "order_id": "9023f7cc-670d-4ab9-beeb-6ea9b63fb1ba", "done": false},
-    {"key": "ladder2", "drop_pct": 0.30, "price": 299.78, "qty": 20, "order_id": "7b45610f-8f2f-412b-a676-75697f6c44f2", "done": false}
+    {
+      "key": "ladder1",
+      "drop_pct": 0.15,
+      "price": 364.02,
+      "qty": 15,
+      "order_id": "50a8bb24-ff9a-40ce-8dd3-8fef616d511e",
+      "done": false
+    },
+    {
+      "key": "ladder2",
+      "drop_pct": 0.25,
+      "price": 321.19,
+      "qty": 25,
+      "order_id": "a8e5b1f5-0cad-45a7-8680-f4c974310b55",
+      "done": false
+    },
+    {
+      "key": "ladder3",
+      "drop_pct": 0.4,
+      "price": 256.96,
+      "qty": 35,
+      "order_id": "9ccaf937-c630-4e4d-854f-502a70c869f1",
+      "done": false
+    }
   ],
   "inicio": "2026-05-08T18:42:17.261306"
 }
