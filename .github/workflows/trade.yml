@@ -1,0 +1,29 @@
+name: Ejecutar Orden Alpaca
+
+on:
+  push:
+    paths:
+      - 'comando.json'
+
+jobs:
+  trade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar dependencias
+        run: pip install alpaca-py
+
+      - name: Ejecutar orden
+        env:
+          APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
+          APCA_API_SECRET_KEY: ${{ secrets.APCA_API_SECRET_KEY }}
+        run: python ejecutar_orden.py
+
+      - name: Guardar resultado
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add resultado.json
+          git commit -m "Resultado de la orden" || echo "Sin cambios"
+          git push
