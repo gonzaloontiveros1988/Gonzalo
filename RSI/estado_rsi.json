@@ -1,0 +1,20 @@
+{
+  "APH": {
+    "posicion_abierta": false,
+    "entry_price": null,
+    "stop": null,
+    "tp": null,
+    "shares": 0,
+    "order_id": null,
+    "ultimo_rsi": null
+  },
+  "ZTS": {
+    "posicion_abierta": false,
+    "entry_price": null,
+    "stop": null,
+    "tp": null,
+    "shares": 0,
+    "order_id": null,
+    "ultimo_rsi": null
+  }
+}
