@@ -1,6 +1,6 @@
 """
-Estrategia RSI + OBV + VWAP — APH y ZTS
-=========================================
+Estrategia RSI + OBV + VWAP — APH, ZTS, INSM, ISRG, DG
+=========================================================
 Señal LONG cuando se cumplen las 3 condiciones:
   1. RSI(14) cruza por encima de 30 (zona de sobreventa)
   2. OBV alcista (subiendo en las últimas barras)
@@ -30,7 +30,7 @@ from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 
 # ── Parámetros ────────────────────────────────────────────────────────────────
-SYMBOLS      = ['APH', 'ZTS']
+SYMBOLS      = ['APH', 'ZTS', 'INSM', 'ISRG', 'DG']
 RSI_PERIOD   = 14
 RSI_SIGNAL   = 30       # cruce por encima de este nivel activa la señal
 ATR_PERIOD   = 14
