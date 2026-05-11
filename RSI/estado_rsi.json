@@ -16,5 +16,32 @@
     "shares": 0,
     "order_id": null,
     "ultimo_rsi": null
+  },
+  "INSM": {
+    "posicion_abierta": false,
+    "entry_price": null,
+    "stop": null,
+    "tp": null,
+    "shares": 0,
+    "order_id": null,
+    "ultimo_rsi": null
+  },
+  "ISRG": {
+    "posicion_abierta": false,
+    "entry_price": null,
+    "stop": null,
+    "tp": null,
+    "shares": 0,
+    "order_id": null,
+    "ultimo_rsi": null
+  },
+  "DG": {
+    "posicion_abierta": false,
+    "entry_price": null,
+    "stop": null,
+    "tp": null,
+    "shares": 0,
+    "order_id": null,
+    "ultimo_rsi": null
   }
 }
