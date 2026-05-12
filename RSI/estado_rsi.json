@@ -6,7 +6,7 @@
     "tp": null,
     "shares": 0,
     "order_id": null,
-    "ultimo_rsi": 16.58
+    "ultimo_rsi": 57.34
   },
   "ZTS": {
     "posicion_abierta": false,
@@ -15,7 +15,7 @@
     "tp": null,
     "shares": 0,
     "order_id": null,
-    "ultimo_rsi": 15.94
+    "ultimo_rsi": 37.33
   },
   "INSM": {
     "posicion_abierta": false,
@@ -24,7 +24,7 @@
     "tp": null,
     "shares": 0,
     "order_id": null,
-    "ultimo_rsi": 40.58
+    "ultimo_rsi": 69.88
   },
   "ISRG": {
     "posicion_abierta": false,
@@ -33,7 +33,7 @@
     "tp": null,
     "shares": 0,
     "order_id": null,
-    "ultimo_rsi": 13.38
+    "ultimo_rsi": 50.24
   },
   "DG": {
     "posicion_abierta": false,
@@ -42,6 +42,6 @@
     "tp": null,
     "shares": 0,
     "order_id": null,
-    "ultimo_rsi": 22.81
+    "ultimo_rsi": 30.17
   }
 }
