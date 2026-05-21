@@ -6,7 +6,7 @@
     "tp": null,
     "shares": 0,
     "order_id": null,
-    "ultimo_rsi": 31.29
+    "ultimo_rsi": 65.55
   },
   "ZTS": {
     "posicion_abierta": false,
@@ -15,7 +15,7 @@
     "tp": null,
     "shares": 0,
     "order_id": null,
-    "ultimo_rsi": 59.04
+    "ultimo_rsi": 56.45
   },
   "INSM": {
     "posicion_abierta": true,
@@ -24,7 +24,7 @@
     "tp": 112.79,
     "shares": 956,
     "order_id": "a6e8215c-0785-4679-9b3e-4e57935d22cc",
-    "ultimo_rsi": 45.87,
+    "ultimo_rsi": 57.99,
     "entrada_ts": "2026-05-18T19:14:29.087377"
   },
   "ISRG": {
@@ -34,7 +34,7 @@
     "tp": null,
     "shares": 0,
     "order_id": null,
-    "ultimo_rsi": 63.51
+    "ultimo_rsi": 47.42
   },
   "DG": {
     "posicion_abierta": false,
@@ -43,6 +43,6 @@
     "tp": null,
     "shares": 0,
     "order_id": null,
-    "ultimo_rsi": 43.15
+    "ultimo_rsi": 54.82
   }
 }
